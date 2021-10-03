@@ -18,4 +18,6 @@ The `Cylinders.csv` and `SunLocations.csv` need to be moved to the Application S
 
 `NM` -> Step through branch orders
 
+`U` -> Undo branch removals
+
 `H` -> Hide raycasts
