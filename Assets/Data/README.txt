@@ -1,0 +1,1 @@
+The Cylinders.csv and SunLocations.csv need to be moved to the Application Support folder as of now for the tree to be imported properly. Will improve this later.
