@@ -5,22 +5,55 @@ using UnityEngine;
 
 public class TreeImporter : MonoBehaviour
 {
+    public class Cylinder {
+        public GameObject gameObject;
+        // public GameObject parent;
+        public int id;
+        public int parentId;
+        public int branchOrder;
+
+        public Cylinder(GameObject cylinder, int id, int parentId, int branchOrder) {
+            this.gameObject = cylinder;
+            this.id = id;
+            this.parentId = parentId;
+            this.branchOrder = branchOrder;
+
+            // cylinder.GetComponent<MeshRenderer>().material.color = color();
+            Color branchColor = color();
+            Color colorLerp = Color.Lerp(Color.black, branchColor, 0.5f);
+            cylinder.GetComponent<MeshRenderer>().material.color = colorLerp;
+        }
+
+        public Color color() {
+            return GetRainbowColor(branchOrder % 6, 6);
+        }
+    }
+
     // public string path;
     // public Object csv;
     public GameObject cylinderPrefab;
     public GameObject treeDestination;
+    private Vector3 treeDestinationPos;
+    private GameObject empty;
     public Dictionary<GameObject, HashSet<GameObject>> tree = new Dictionary<GameObject, HashSet<GameObject>>();
+    public Dictionary<GameObject, Cylinder> cylinderMap = new Dictionary<GameObject, Cylinder>(); // data
 
     // Start is called before the first frame update
     void Start() {
+        empty = Object.Instantiate(treeDestination);
+        // dimensions are (1.0, 2.0, 1.0)
+        Debug.Log("dims = " + cylinderPrefab.GetComponent<MeshRenderer>().bounds.size);
+        treeDestinationPos = treeDestination.transform.position;
         // string path = AssetDatabase.GetAssetPath(csv);
         // string path = Application.persistentDataPath(csv);
         // string path = Application.persistentDataPath + "/Cylinders.csv";
         string path = Application.persistentDataPath + "/CylindersFull.csv";
         Debug.Log(path);
-        List<List<float>> cylinderData = ParseCylinderCSV(path);
+        //- List<List<float>> cylinderData = ParseCylinderCSV(path);
+        List<List<float>> cylinderData = ParseCylinderCSV();
         PlaceCylinders(cylinderData, treeDestination);
         // PlaceMultipleCylinders(cylinderData, treeDestination);
+
     }
 
     // Update is called once per frame
@@ -33,16 +66,24 @@ public class TreeImporter : MonoBehaviour
             }
         }
         if (Input.GetKeyDown(KeyCode.N)) {
-            SetActiveOrders(currentOrder, false);
-            currentOrder = System.Math.Max(0, currentOrder - 1);
+            PreviousBranchOrder();
         }
         if (Input.GetKeyDown(KeyCode.M)) {
-            SetActiveOrder(currentOrder, true);
-            currentOrder = System.Math.Min(currentOrder + 1, orders.Count - 1);
+            NextBranchOrder();
         }
-        if (Input.GetKeyDown(KeyCode.U)) {
+        if (Input.GetKeyDown(KeyCode.U)) { // || OVRInput.GetDown(OVRInput.Button.Two)) {
             UnhideTree();
         }
+    }
+
+    public void NextBranchOrder() {
+        SetActiveOrder(currentOrder, true);
+        currentOrder = System.Math.Min(currentOrder + 1, orders.Count - 1);
+    }
+
+    public void PreviousBranchOrder() {
+        SetActiveOrders(currentOrder, false);
+        currentOrder = System.Math.Max(0, currentOrder - 1);
     }
 
     public GameObject GetClickedOnObject() {
@@ -99,6 +140,7 @@ public class TreeImporter : MonoBehaviour
 
     List<GameObject> cylinders = new List<GameObject>();
     List<int> parentIds = new List<int>();
+    List<int> branchOrders = new List<int>();
 
     private void PlaceCylinders(List<List<float>> cylinderData, GameObject parent) {
         // Vector3 axis = Vector3.up;
@@ -122,6 +164,7 @@ public class TreeImporter : MonoBehaviour
             float axisY = parameters[7];
 
             int parentId = (int) parameters[8];
+            int branchOrder = (int) parameters[15];
 
             Vector3 position = new Vector3(posX, posY, posZ);
             Vector3 dir = new Vector3(axisX, axisY, axisZ);
@@ -129,17 +172,53 @@ public class TreeImporter : MonoBehaviour
             Quaternion rotation = Quaternion.LookRotation(dir) * Quaternion.FromToRotation(Vector3.up, Vector3.forward);
             Vector3 scale = new Vector3(diameter, length * 0.5f, diameter);
 
-            GameObject cylinder = Object.Instantiate(cylinderPrefab, position, rotation, parent.transform);
+            // GameObject cylinder = Object.Instantiate(cylinderPrefab, position, rotation, parent.transform);
+
+            /*
+            GameObject tempParent = Object.Instantiate(empty, position, rotation, parent.transform);
+            Vector3 newOrigin = new Vector3(0, -1, 0);
+            // GameObject cylinder = Object.Instantiate(cylinderPrefab, newOrigin, Quaternion.LookRotation(Vector3.forward), tempParent.transform);
+            GameObject cylinder = Object.Instantiate(cylinderPrefab, position, rotation, tempParent.transform);
+            cylinder.transform.position += newOrigin;
+            cylinder.transform.parent = null;
+            cylinder.transform.parent = parent.transform;
+            Destroy(tempParent);
+            */
+            GameObject tempParent = Object.Instantiate(empty, Vector3.zero, Quaternion.Euler(0, 0, 0), parent.transform);
+            Vector3 newOrigin = new Vector3(0, length / 2f, 0);
+            // GameObject cylinder = Object.Instantiate(cylinderPrefab, newOrigin, Quaternion.LookRotation(Vector3.forward), tempParent.transform);
+            // GameObject cylinder = Object.Instantiate(cylinderPrefab, position, rotation, tempParent.transform);
+            GameObject cylinder = Object.Instantiate(cylinderPrefab, Vector3.zero, Quaternion.Euler(0, 0, 0), tempParent.transform);
+            cylinder.transform.position = newOrigin;
+            tempParent.transform.position = position;
+            tempParent.transform.rotation = rotation;
+            cylinder.transform.parent = null;
+            cylinder.transform.parent = parent.transform;
+            Destroy(tempParent);
+
+
             cylinder.transform.localScale = scale;
 
             cylinders.Add(cylinder);
             parentIds.Add(parentId);
+            branchOrders.Add(branchOrder);
+
+            /*
+            Cylinder datum = new Cylinder();
+            datum.gameObject = cylinder;
+            datum.id = id;
+            datum.parentId = parentId;
+            datum.branchOrder = branchOrder;
+            */
+            Cylinder datum = new Cylinder(cylinder, id, parentId, branchOrder);           
+            cylinderMap[cylinder] = datum;
 
             id++;
         }
         // parent.transform.CenterOnChildred();
         CenterOnChildred(parent.transform);
-        parent.transform.position = Vector3.zero;
+        // parent.transform.position = Vector3.zero;
+        parent.transform.position = treeDestinationPos;
         parent.transform.localScale *= 3;
 
         // build parents
@@ -167,6 +246,7 @@ public class TreeImporter : MonoBehaviour
             // cylinder.transform.LookAt(parentCylinder.transform, Vector3.left);
         }
 
+        // ColorBranches();
         BuildOrders(cylinders[0]);
         currentOrder = orders.Count - 1;
     }
@@ -197,10 +277,17 @@ public class TreeImporter : MonoBehaviour
         return progeny;
     }
 
+    private void ColorBranches() {
+        foreach (GameObject cylinder in cylinders) {
+            cylinder.GetComponent<MeshRenderer>().material.color = GetBranchColor(cylinder);
+        }
+    }
+
     public int currentOrder = 0;
     private List<HashSet<GameObject>> orders = new List<HashSet<GameObject>>();
     private void BuildOrders(GameObject root) {
-        BuildOrders(root, 0);
+        // BuildOrders(root, 0);
+        BuildOrdersCSV(root, 0);
     }
     private void BuildOrders(GameObject root, int depth) {
         HashSet<GameObject> order;
@@ -222,6 +309,27 @@ public class TreeImporter : MonoBehaviour
         foreach (GameObject child in children) {
             order.Add(child);
             BuildOrders(child, depth + 1);
+        }
+    }
+
+    private void BuildOrdersCSV(GameObject root, int depth) {
+        // iterate through all cylinders and put them in their respective branch orders
+
+        int k = 0;
+        int max = Mathf.Max(branchOrders.ToArray());
+        orders = new List<HashSet<GameObject>>(max + 1);
+        for (int i = 0; i <= max; i++) {
+            orders.Add(new HashSet<GameObject>());
+        }
+
+        foreach (GameObject cylinder in cylinders) {
+            root = cylinder;
+            int branchOrder = branchOrders[k];
+            depth = branchOrder;
+
+            HashSet<GameObject> order = orders[depth];
+            order.Add(cylinder);
+            k++;
         }
     }
 
@@ -306,8 +414,32 @@ public class TreeImporter : MonoBehaviour
         return list;
     }
 
+    public int GetBranchOrder(GameObject cylinder) {
+        // should add null check
+        Cylinder datum = cylinderMap[cylinder];
+        return datum.branchOrder;
+    }
+
+    public Color GetBranchColor(GameObject cylinder) {
+        // should add null check
+        Cylinder datum = cylinderMap[cylinder];
+        return datum.color();
+    }
+
     private List<List<float>> ParseCylinderCSV(string path) {
         string fileData = System.IO.File.ReadAllText(path);
+        return ParseCylinderCSVString(fileData);
+    }
+
+    private List<List<float>> ParseCylinderCSV() {
+        // Constants constants = transform.GetComponent<Constants>();
+        // string fileData = System.IO.File.ReadAllText(path);
+        string fileData = Constants.CylindersFull;
+        return ParseCylinderCSVString(fileData);
+    }
+
+    private List<List<float>> ParseCylinderCSVString(string fileData) {
+        //- string fileData = System.IO.File.ReadAllText(path);
         string[] lines = fileData.Split("\n"[0]);
         string[] lineData = (lines[0].Trim()).Split(","[0]);
         List<List<float>> cylinderData = new List<List<float>>();
@@ -329,6 +461,7 @@ public class TreeImporter : MonoBehaviour
         return cylinderData;
     }
 
+    /*
     private List<List<float>> ParseCylinderEulerCSV(string path) {
         string fileData = System.IO.File.ReadAllText(path);
         string[] lines = fileData.Split("\n"[0]);
@@ -383,5 +516,34 @@ public class TreeImporter : MonoBehaviour
         parent.transform.position = Vector3.zero;
         parent.transform.localScale *= 3;
     }
+    */
 
+
+    static Color GetRainbowColor(int index, int count) {
+        float progress = ((float)index) / count;
+        float div = (Mathf.Abs(progress % 1) * 6);
+        int ascending = (int)((div % 1) * 255);
+        int descending = 255 - ascending;
+
+        // Color color = new Color(
+
+        switch ((int)div) {
+            case 0:
+                return FromArgb(255, 255, ascending, 0);
+            case 1:
+                return FromArgb(255, descending, 255, 0);
+            case 2:
+                return FromArgb(255, 0, 255, ascending);
+            case 3:
+                return FromArgb(255, 0, descending, 255);
+            case 4:
+                return FromArgb(255, ascending, 0, 255);
+            default: // case 5:
+                return FromArgb(255, 255, 0, descending);
+        }
+    }
+
+    static Color FromArgb(int a, int r, int g, int b) {
+        return new Color(r / 256f, g / 256f, b / 256f, a / 256f);
+    }
 }
