@@ -15,16 +15,22 @@ public class SunManager : MonoBehaviour
 
     public Transform grid;
     public Transform light;
+    public GameObject treeDestination;
+    private Vector3 treeDestinationPos;
+
     public LightQuantifier quantifier;
     private List<SunState> states;
     private int stateIndex = 0;
 
     // Start is called before the first frame update
     void Start() {
+        treeDestinationPos = treeDestination.transform.position;
+
         string path = Application.persistentDataPath + "/SunLocations.csv";
         Debug.Log(path);
         // List<SunState> sunStates = ParseSunCSV(path);
-        states = ParseSunCSV(path);
+        //- states = ParseSunCSV(path);
+        states = ParseSunCSV();
         // PlaceCylinders(cylinderData, treeDestination);
     }
 
@@ -33,13 +39,12 @@ public class SunManager : MonoBehaviour
         if (!Done()) {
             GatherData();
         }
+        // float HandLeft = OVRInput.Get(OVRInput.Axis1D.PrimaryHandTrigger);
         if (Input.GetKeyDown(KeyCode.Z)) {
-            stateIndex = System.Math.Max(0, stateIndex - 1);
-            UpdateSun();
+            PreviousSunPosition();
         }
         if (Input.GetKeyDown(KeyCode.X)) {
-            stateIndex = System.Math.Min(stateIndex + 1, states.Count - 1);
-            UpdateSun();
+            NextSunPosition();
         }
 
         CompareToBaseline();
@@ -53,6 +58,16 @@ public class SunManager : MonoBehaviour
         // Debug.Log("timestamp = " + state.timestamp + ", totalHits = " + normalizeTotalHits(state.totalHits));
         // light.rotation = state.lightRotation;
         //- buildTotalHitsCSV();
+    }
+
+    public void PreviousSunPosition() {
+        stateIndex = System.Math.Max(0, stateIndex - 1);
+        UpdateSun();
+    }
+
+    public void NextSunPosition() {
+        stateIndex = System.Math.Min(stateIndex + 1, states.Count - 1);
+        UpdateSun();
     }
 
     public void CompareToBaseline() {
@@ -72,6 +87,40 @@ public class SunManager : MonoBehaviour
             "difference = " + increase + ", " +
             "percent increase = " + percent);
 
+    }
+
+    public string GetBaselineText() {
+        UpdateSun();
+
+        SunState state = states[stateIndex];
+        int baseHits = state.baseTotalHits;
+        int hits = state.totalHits;
+        float nBaseHits = normalizeTotalHits(state.baseTotalHits);
+        float nHits = normalizeTotalHits(state.totalHits);
+
+        int increase = hits - baseHits;
+        float percent = 100f * (nHits - nBaseHits) / nBaseHits;
+
+        return "baseline hits = " + baseHits + ", " +
+            "hits = " + hits + ", " +
+            // "percent increase = " + percent;
+            state.timestamp;
+    }
+
+    public float[] GetBaseline() {
+        UpdateSun();
+
+        SunState state = states[stateIndex];
+        int baseHits = state.baseTotalHits;
+        int hits = state.totalHits;
+        float nBaseHits = normalizeTotalHits(state.baseTotalHits);
+        float nHits = normalizeTotalHits(state.totalHits);
+
+        int increase = hits - baseHits;
+        float percent = 100f * (nHits - nBaseHits) / nBaseHits;
+
+        float[] result = { baseHits, hits, percent };
+        return result;
     }
 
     public void GatherData() {
@@ -119,9 +168,20 @@ public class SunManager : MonoBehaviour
         // Debug.Log(result);
     }
 
-
     private List<SunState> ParseSunCSV(string path) {
         string fileData = System.IO.File.ReadAllText(path);
+        return ParseSunCSVString(fileData);
+    }
+
+    private List<SunState> ParseSunCSV() {
+        // Constants constants = transform.GetComponent<Constants>();
+        // string fileData = System.IO.File.ReadAllText(path);
+        string fileData = Constants.SunLocations;
+        return ParseSunCSVString(fileData);
+    }
+
+    private List<SunState> ParseSunCSVString(string fileData) {
+        //- string fileData = System.IO.File.ReadAllText(path);
         string[] lines = fileData.Split("\n"[0]);
         string[] lineData = (lines[0].Trim()).Split(","[0]);
         // List<List<float>> sunData = new List<List<float>>();
@@ -144,7 +204,7 @@ public class SunManager : MonoBehaviour
 
                 SunState state = new SunState();
                 Vector3 pos = new Vector3(posX, posY, posZ);
-                state.position = new Vector3(-3f, 10.93f, 0f);
+                state.position = new Vector3(-3f, 10.93f, 0f) + treeDestinationPos;
                 state.rotation = Quaternion.LookRotation(pos, Vector3.down);
                 state.lightRotation = Quaternion.LookRotation(pos, Vector3.up);
                 state.timestamp = timestamp;
@@ -159,4 +219,6 @@ public class SunManager : MonoBehaviour
         // Debug.Log(lineData.Length);
         return sunStates;
     }
+
+
 }
