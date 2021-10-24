@@ -6,7 +6,7 @@ The `Cylinders.csv` and `SunLocations.csv` need to be moved to the Application S
 
 ## Development Process
 
-The `Assets/Scenes/LocomotionVR.unity`scene is the primary scene that gets run and built on the Oculus. However, the `Assets/Scenes/Main.unity`scene can be run locally on your computer and is great for developing non VR related features. Duplicate the `Assets/Scenes/Main.unity`scene and make changes to your copy in order to avoid merge conflicts.
+The `Assets/Scenes/LocomotionVR.unity` scene is the primary scene that gets run and built on the Oculus. However, the `Assets/Scenes/Main.unity` scene can be run locally on your computer and is great for developing non VR related features. Duplicate the `Assets/Scenes/Main.unity` scene and make changes to your copy in order to avoid merge conflicts.
 
 ## Controls
 
