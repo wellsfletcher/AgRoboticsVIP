@@ -11,12 +11,18 @@ public class TreeImporter : MonoBehaviour
         public int id;
         public int parentId;
         public int branchOrder;
+        public bool isWaterSprout;
 
-        public Cylinder(GameObject cylinder, int id, int parentId, int branchOrder) {
+        public Cylinder(GameObject cylinder, TreeImporter treeImporter, int id, int parentId, int branchOrder, bool isWaterSprout) {
             this.gameObject = cylinder;
             this.id = id;
             this.parentId = parentId;
             this.branchOrder = branchOrder;
+            this.isWaterSprout = isWaterSprout;
+
+            if (isWaterSprout) {
+                cylinder.GetComponent<MeshRenderer>().material = treeImporter.waterSproutMat;
+            }
 
             // cylinder.GetComponent<MeshRenderer>().material.color = color();
             Color branchColor = color();
@@ -25,6 +31,10 @@ public class TreeImporter : MonoBehaviour
         }
 
         public Color color() {
+            if (isWaterSprout) {
+                return Color.white;
+            }
+
             return GetRainbowColor(branchOrder % 6, 6);
         }
     }
@@ -33,6 +43,7 @@ public class TreeImporter : MonoBehaviour
     // public Object csv;
     public GameObject cylinderPrefab;
     public GameObject treeDestination;
+    public Material waterSproutMat;
     private Vector3 treeDestinationPos;
     private GameObject empty;
     public Dictionary<GameObject, HashSet<GameObject>> tree = new Dictionary<GameObject, HashSet<GameObject>>();
@@ -166,6 +177,9 @@ public class TreeImporter : MonoBehaviour
             int parentId = (int) parameters[8];
             int branchOrder = (int) parameters[15];
 
+            bool isWaterSprout = (parameters[17] == 0 ? false : true); // column R
+            // float waterSproutScore = parameters[18];
+
             Vector3 position = new Vector3(posX, posY, posZ);
             Vector3 dir = new Vector3(axisX, axisY, axisZ);
             // Quaternion rotation = Quaternion.LookRotation(axis, dir);
@@ -196,13 +210,42 @@ public class TreeImporter : MonoBehaviour
             cylinder.transform.parent = parent.transform;
             Destroy(tempParent);
 
-
             cylinder.transform.localScale = scale;
 
             cylinders.Add(cylinder);
             parentIds.Add(parentId);
             branchOrders.Add(branchOrder);
 
+            GameObject parentCylinder = (parentId > 0) ? cylinders[parentId - 1] : null;
+            if (parentCylinder != null) {
+                /*
+                // cylinder.AddComponent<Rigidbody>();
+                Rigidbody body = cylinder.GetComponent<Rigidbody>();
+                body.isKinematic = false;
+                HingeJoint joint = cylinder.AddComponent<HingeJoint>();
+                joint.autoConfigureConnectedAnchor = false;
+                // joint.connectedAnchor = position;
+                joint.connectedBody = parentCylinder.GetComponent<Rigidbody>();
+                // joint.connectedAnchor = newOrigin;
+                // joint.connectedAnchor = parentCylinder.transform.InverseTransformPoint(position);
+                joint.connectedAnchor = cylinder.transform.InverseTransformPoint(position);
+                joint.useLimits = true;
+                */
+                /*
+                // cylinder.AddComponent<Rigidbody>();
+                Rigidbody body = cylinder.GetComponent<Rigidbody>();
+                body.isKinematic = false;
+                HingeJoint joint = parentCylinder.AddComponent<HingeJoint>();
+                joint.autoConfigureConnectedAnchor = false;
+                // joint.connectedAnchor = position;
+                joint.connectedBody = cylinder.GetComponent<Rigidbody>();
+                // joint.connectedAnchor = newOrigin;
+                // joint.connectedAnchor = parentCylinder.transform.InverseTransformPoint(position);
+                joint.connectedAnchor = cylinder.transform.InverseTransformPoint(position);
+                joint.useLimits = true;
+                */
+            }
+           
             /*
             Cylinder datum = new Cylinder();
             datum.gameObject = cylinder;
@@ -210,7 +253,7 @@ public class TreeImporter : MonoBehaviour
             datum.parentId = parentId;
             datum.branchOrder = branchOrder;
             */
-            Cylinder datum = new Cylinder(cylinder, id, parentId, branchOrder);           
+            Cylinder datum = new Cylinder(cylinder, this, id, parentId, branchOrder, isWaterSprout);           
             cylinderMap[cylinder] = datum;
 
             id++;
@@ -249,6 +292,10 @@ public class TreeImporter : MonoBehaviour
         // ColorBranches();
         BuildOrders(cylinders[0]);
         currentOrder = orders.Count - 1;
+    }
+
+    private void AddJoint(GameObject a, GameObject parent, Vector3 point) {
+
     }
 
     public List<GameObject> FindChildren(GameObject cylinder) {
@@ -423,6 +470,11 @@ public class TreeImporter : MonoBehaviour
     public Color GetBranchColor(GameObject cylinder) {
         // should add null check
         Cylinder datum = cylinderMap[cylinder];
+
+        /*if (datum.isWaterSprout) {
+            return Color.white;
+        }*/
+
         return datum.color();
     }
 
@@ -434,7 +486,8 @@ public class TreeImporter : MonoBehaviour
     private List<List<float>> ParseCylinderCSV() {
         // Constants constants = transform.GetComponent<Constants>();
         // string fileData = System.IO.File.ReadAllText(path);
-        string fileData = Constants.CylindersFull;
+        // string fileData = Constants.CylindersFull;
+        string fileData = Constants.CylindersFull1a; // CylindersFull1a, CylindersFull3a
         return ParseCylinderCSVString(fileData);
     }
 

@@ -1337,7 +1337,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
-  m_RenderPostProcessing: 0
+  m_RenderPostProcessing: 1
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -2447,6 +2447,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cylinderPrefab: {fileID: 2081614836226307479, guid: 355b98f4bc42142a4bab2ff237bfd7f8, type: 3}
   treeDestination: {fileID: 222146482}
+  waterSproutMat: {fileID: 2100000, guid: ec739259ec61f5d4ba3ed6d34fd802a6, type: 2}
   currentOrder: 0
 --- !u!114 &1813328301
 MonoBehaviour:
