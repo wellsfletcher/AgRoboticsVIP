@@ -17,27 +17,26 @@ using Debug = UnityEngine.Debug;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
 
-public class LocomotionSampleSupport : MonoBehaviour
-{
+public class LocomotionSampleSupport : MonoBehaviour {
     public SunManager sunManager;
     public TreeImporter treeImporter;
     Text statusLabel;
     Slider statusSlider;
     Text statusSliderText;
+    VisualizerBar optimalBar;
+    VisualizerBar currentBar;
+    // VisualizerBar aBar;
 
 
     private LocomotionController lc;
     private bool inMenu = false;
-    private LocomotionTeleport TeleportController
-    {
-        get
-        {
-            return lc.GetComponent<LocomotionTeleport>(); 
+    private LocomotionTeleport TeleportController {
+        get {
+            return lc.GetComponent<LocomotionTeleport>();
         }
     }
 
-    public void Start()
-    {
+    public void Start() {
         lc = FindObjectOfType<LocomotionController>();
         DebugUIBuilder.instance.AddLabel("Persephone Menu");
         DebugUIBuilder.instance.AddDivider();
@@ -48,18 +47,22 @@ public class LocomotionSampleSupport : MonoBehaviour
         //DebugUIBuilder.instance.AddButton("R Turn L Teleport", SetupRightTurnLeftTeleport);
         DebugUIBuilder.instance.AddButton("Walk Only", SetupWalkOnly);
         DebugUIBuilder.instance.AddDivider();
-        */       
+        */
 
         DebugUIBuilder.instance.AddButton("Next sun position", sunManager.NextSunPosition);
         DebugUIBuilder.instance.AddButton("Previous sun position", sunManager.PreviousSunPosition);
         DebugUIBuilder.instance.AddButton("Next branch order", treeImporter.NextBranchOrder);
         DebugUIBuilder.instance.AddButton("Previous branch order", treeImporter.PreviousBranchOrder);
         DebugUIBuilder.instance.AddButton("Reset tree", treeImporter.UnhideTree);
+        DebugUIBuilder.instance.AddButton("Toggle water sprouts", DoNothing);
+        DebugUIBuilder.instance.AddButton("Toggle leaves", treeImporter.ToggleLeaves);
+        DebugUIBuilder.instance.AddButton("Calc Average Exposure", sunManager.Restart);
         // DebugUIBuilder.instance.
         // DebugUIBuilder.instance.addsl
         DebugUIBuilder.instance.AddDivider();
         RectTransform statusLabelRect = DebugUIBuilder.instance.AddLabel("Tree Status");
         statusLabel = statusLabelRect.GetComponent<Text>();
+        /*
         RectTransform statusSliderRect = DebugUIBuilder.instance.AddSlider("Exposure", 0f, 1f, HandleOnSlider);
         statusSlider = statusSliderRect.transform.GetChild(0).GetComponent<Slider>();
         statusSlider.interactable = false;
@@ -67,8 +70,14 @@ public class LocomotionSampleSupport : MonoBehaviour
         ColorBlock colors = statusSlider.colors;
         colors.disabledColor = Color.clear;
         statusSlider.colors = colors;
-        statusSliderRect.GetChild(1).GetChild(0).GetComponent<Text>().text = "Light Exposure";
+        statusSliderRect.GetChild(1).GetChild(0).GetComponent<Text>().text = "Average Light Exposure";
         statusSliderText = statusSliderRect.GetChild(1).GetChild(1).GetComponent<Text>();
+        */
+        currentBar = new VisualizerBar("Average Lightness");
+        optimalBar = new VisualizerBar("Optimal Lightness");
+
+        // DebugUIBuilder.instance.AddDivider();
+
 
         /*
         DebugUIBuilder.instance.AddRadio("Radio1", "group", delegate (Toggle t) { RadioPressed("Radio1", "group", t); });
@@ -80,8 +89,7 @@ public class LocomotionSampleSupport : MonoBehaviour
 
         // This is just a quick hack-in, need a prefab-based way of setting this up easily.
         EventSystem eventSystem = FindObjectOfType<EventSystem>();
-        if (eventSystem == null)
-        {
+        if (eventSystem == null) {
             Debug.LogError("Need EventSystem");
         }
         //- SetupTwoStickTeleport();
@@ -98,6 +106,41 @@ public class LocomotionSampleSupport : MonoBehaviour
 
     }
 
+    void DoNothing() {
+
+    }
+
+    class VisualizerBar {
+        Text text;
+        Slider slider;
+
+        public VisualizerBar(string initialText) {
+            RectTransform statusSliderRect = DebugUIBuilder.instance.AddSlider(initialText, 0f, 1f, HandleOnSlider);
+            slider = statusSliderRect.transform.GetChild(0).GetComponent<Slider>();
+            slider.interactable = false;
+            // statusSlider.colors.disabledColor = Color.clear;
+            ColorBlock colors = slider.colors;
+            colors.disabledColor = Color.clear;
+            slider.colors = colors;
+            statusSliderRect.GetChild(1).GetChild(0).GetComponent<Text>().text = initialText;
+            text = statusSliderRect.GetChild(1).GetChild(1).GetComponent<Text>();
+        } 
+
+        private void HandleOnSlider(float f) {
+
+        }
+
+        /*
+         * Value is between 0 and 1      
+         */     
+        public void setValue(float f) {
+            if (f >= 0.0f && f <= 1.0f) {
+                slider.value = f;
+            }
+            text.text = "" + (f * 100) + "%";
+        }
+    }
+
     public void RadioPressed(string radioLabel, string group, Toggle t) {
         Debug.Log("Radio value changed: " + radioLabel + ", from group " + group + ". New value: " + t.isOn);
     }
@@ -112,12 +155,17 @@ public class LocomotionSampleSupport : MonoBehaviour
             inMenu = !inMenu;
         }
         statusLabel.text = sunManager.GetBaselineText();
+        /*
         // statusSlider.value = 0.5f;
         float sliderValue = (100f + sunManager.GetBaseline()[2]) / 100f;
         if (sliderValue >= 0.0f && sliderValue <= 1.0f) {
             statusSlider.value = sliderValue; // (100f + sunManager.GetBaseline()[2]) / 100f;
             statusSliderText.text = "" + (sliderValue * 100) + "%";
         }
+        */
+        // currentBar.setValue((100f + sunManager.GetBaseline()[2]) / 100f);
+        currentBar.setValue(sunManager.CalculateAverageLightExposure());
+        optimalBar.setValue(0.93f);
         Debug.Log(statusSlider.value);
     }
 

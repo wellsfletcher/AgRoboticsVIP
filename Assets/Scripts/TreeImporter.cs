@@ -12,6 +12,7 @@ public class TreeImporter : MonoBehaviour
         public int parentId;
         public int branchOrder;
         public bool isWaterSprout;
+        public HashSet<GameObject> leaves;
 
         public Cylinder(GameObject cylinder, TreeImporter treeImporter, int id, int parentId, int branchOrder, bool isWaterSprout) {
             this.gameObject = cylinder;
@@ -37,20 +38,71 @@ public class TreeImporter : MonoBehaviour
 
             return GetRainbowColor(branchOrder % 6, 6);
         }
+
+        public void AddLeaf(GameObject leaf) {
+            leaves.Add(leaf);
+        }
+
+        public HashSet<GameObject> GetLeaves() {
+            return leaves;
+        }
+    }
+
+    public class Leaf {
+        GameObject gameObject;
+        Cylinder cylinder;
+        Vector3 baseScale;
+        public Leaf(GameObject leaf, Cylinder cylinder) {
+            this.gameObject = leaf;
+            this.cylinder = cylinder;
+            this.baseScale = leaf.transform.localScale;
+        }
+
+        public void SetPercentScale(float percent) {
+            // this.gameObject.transform.localScale = Vector3.one * scale * percent;
+            this.gameObject.transform.localScale = baseScale * percent;
+        }
+    }
+
+    public class Tree {
+        List<GameObject> cylinders;
+        List<GameObject> leaves;
+        Dictionary<GameObject, Cylinder> go2cylinder;
+        Dictionary<GameObject, Leaf> go2leaf;
+
+        public Tree(List<GameObject> cylinders, List<GameObject> leaves, Dictionary<GameObject, Cylinder> go2cylinder, Dictionary<GameObject, Leaf> go2leaf) {
+            this.cylinders = cylinders;
+            this.leaves = leaves;
+            this.go2cylinder = go2cylinder;
+            this.go2leaf = go2leaf;
+        }
+
+        public void SetLeafPercentScale(float percent) {
+            foreach (GameObject leaf in leaves) {
+                Leaf datum = go2leaf[leaf];
+                datum.SetPercentScale(percent);
+            }
+        }
     }
 
     // public string path;
     // public Object csv;
     public GameObject cylinderPrefab;
+    public GameObject leafPrefab;
     public GameObject treeDestination;
     public Material waterSproutMat;
     private Vector3 treeDestinationPos;
+    private LightQuantifier quantifier;
+
     private GameObject empty;
-    public Dictionary<GameObject, HashSet<GameObject>> tree = new Dictionary<GameObject, HashSet<GameObject>>();
-    public Dictionary<GameObject, Cylinder> cylinderMap = new Dictionary<GameObject, Cylinder>(); // data
+    public Tree tree;
+    public Dictionary<GameObject, HashSet<GameObject>> childMap = new Dictionary<GameObject, HashSet<GameObject>>();
+    public Dictionary<GameObject, Cylinder> go2cylinder = new Dictionary<GameObject, Cylinder>(); // data
+    public Dictionary<GameObject, Leaf> go2leaf = new Dictionary<GameObject, Leaf>(); // data
 
     // Start is called before the first frame update
     void Start() {
+        quantifier = gameObject.GetComponent<LightQuantifier>();
         empty = Object.Instantiate(treeDestination);
         // dimensions are (1.0, 2.0, 1.0)
         Debug.Log("dims = " + cylinderPrefab.GetComponent<MeshRenderer>().bounds.size);
@@ -85,6 +137,9 @@ public class TreeImporter : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.U)) { // || OVRInput.GetDown(OVRInput.Button.Two)) {
             UnhideTree();
         }
+        if (Input.GetKeyDown(KeyCode.L)) { // || OVRInput.GetDown(OVRInput.Button.Two)) {
+            ToggleLeaves();
+        }
     }
 
     public void NextBranchOrder() {
@@ -107,6 +162,7 @@ public class TreeImporter : MonoBehaviour
         return null;
     }
 
+    /*
     private void PlaceMultipleCylinders(List<List<float>> cylinderData, GameObject parent) {
         List<Vector3> axises = new List<Vector3>();
         // axises.Add(new Vector3(0, 0, 0));
@@ -143,13 +199,15 @@ public class TreeImporter : MonoBehaviour
         foreach (Vector3 axis in axises) {
             GameObject tree = Object.Instantiate(parent);
             // PlaceCylinders(cylinderData, tree, axis);
-            tree.transform.position += Vector3.up * k * 8;
+            childMap.transform.position += Vector3.up * k * 8;
 
             k++;
         }
     }
+    */
 
     List<GameObject> cylinders = new List<GameObject>();
+    List<GameObject> leaves = new List<GameObject>();
     List<int> parentIds = new List<int>();
     List<int> branchOrders = new List<int>();
 
@@ -254,7 +312,72 @@ public class TreeImporter : MonoBehaviour
             datum.branchOrder = branchOrder;
             */
             Cylinder datum = new Cylinder(cylinder, this, id, parentId, branchOrder, isWaterSprout);           
-            cylinderMap[cylinder] = datum;
+            go2cylinder[cylinder] = datum;
+
+
+
+
+
+            // leaves generation from here
+            int density = 4; // 10
+            for (int i = 0; i < density; i++) {
+                float a = Random.Range(-0.1f, 0.1f);
+                float b = Random.Range(-0.1f, 0.1f);
+                float c = Random.Range(-0.1f, 0.1f);
+                float d = Random.Range(-0.1f, 0.1f);
+
+                GameObject leaf = Object.Instantiate(leafPrefab, position, rotation); // true refers to defining to world space coordinate
+                //leaf.transform.SetParent(cylinder.transform,false);
+                leaf.transform.parent = null;
+                leaf.transform.parent = cylinder.transform;
+
+
+                float distance = length * ((float)i / density);
+                //Vector3 scale_new = new Vector3(diameter*20, diameter *20, diameter*20);
+                //leaf.transform.localScale = scale_new;
+
+
+                Vector3 newPosition = position + rotation * Vector3.up * distance;
+                leaf.transform.position = newPosition;
+                Vector3 randomPosition = newPosition;
+                randomPosition.x += d;
+                randomPosition.y += d;
+                randomPosition.z += d;
+                leaf.transform.position = randomPosition;
+
+                float deviatioin = Vector3.Distance(position, randomPosition) / (float)0.173205 / 2;
+                float fromCenter = Vector3.Distance(new Vector3(0.55f, -1.582687f, -0.3488998f), randomPosition) / 10 - (float)62.4;
+                //Mathf.Pow(branchOrder,(float)1.0)*
+                float probablity = (fromCenter / 3) * 200;
+                //leaf.transform.localScale = new Vector3 (probablity,probablity/(float)6.25,probablity);
+                float deviationSize = (Gaussian(d) + 10) / 10;
+                // float grandScale = 0.005f;
+                // float grandScale = 0.000025f;
+                float grandScale = 0.000025f;
+
+                float x = grandScale * probablity * deviationSize;
+                float y = grandScale * probablity * deviationSize;
+                float z = grandScale * probablity * deviationSize;
+                x /= cylinder.transform.localScale.x;
+                y /= cylinder.transform.localScale.y;
+                z /= cylinder.transform.localScale.z;
+
+                leaf.transform.localScale = new Vector3(x, y, z);
+                Debug.Log("|leaf|: grandScale = " + grandScale + ", fromCenter = " + fromCenter + ", probablity = " + probablity + ", deviationSize = " + deviationSize + ", sphereSize = " + x);
+                //- leaf.GetComponent<Renderer>().material.color = Color.green;
+                //- leaf.GetComponent<Renderer>().material.color = datum.color();
+                //var col = leaf.GetComponent<Renderer> ().material.GetColor("_TintColor");
+                //col.a = 0.5f;
+
+                leaves.Add(leaf);
+
+                Leaf leafDatum = new Leaf(leaf, datum);
+                go2leaf[leaf] = leafDatum;
+            }
+            // leaves generation ends here
+
+
+
 
             id++;
         }
@@ -264,6 +387,9 @@ public class TreeImporter : MonoBehaviour
         parent.transform.position = treeDestinationPos;
         parent.transform.localScale *= 3;
 
+        // make tree objects
+        tree = new Tree(cylinders, leaves, go2cylinder, go2leaf);
+
         // build parents
         for (int k = 1; k < cylinders.Count; k++) {
             int parentId = parentIds[k] - 1;
@@ -272,15 +398,15 @@ public class TreeImporter : MonoBehaviour
             GameObject parentCylinder = cylinders[parentId];
 
             HashSet<GameObject> children;
-            if (tree.ContainsKey(parentCylinder)) {
-                children = tree[parentCylinder];
+            if (childMap.ContainsKey(parentCylinder)) {
+                children = childMap[parentCylinder];
             }
             else {
                 children = new HashSet<GameObject>(); 
             }
 
             children.Add(cylinder);
-            tree[parentCylinder] = children;
+            childMap[parentCylinder] = children;
 
             //- cylinder.transform.parent = parentCylinder.transform;
             Vector3 lookPos = parentCylinder.transform.position - cylinder.transform.position;
@@ -298,6 +424,48 @@ public class TreeImporter : MonoBehaviour
 
     }
 
+    /*
+     * Returns a value between 0 and 1
+     */
+    private float calculateLeafScale(float t) {
+        return 0;
+    }
+
+    class Sphere {
+        Vector3 point;
+        float radius;
+        public Sphere(Vector3 point, float radius) {
+            this.point = point;
+            this.radius = radius;
+        }
+    }
+
+    private Sphere fitSphere(List<Vector3> points) {
+
+
+
+        float radius = 1;
+        float x = 0;
+        float y = 0;
+        float z = 0;
+        Vector3 point = new Vector3(x, y, z);
+        return new Sphere(point, radius);
+    }
+
+    public static float Gaussian(float deviatioin) {
+        float v1, v2, s;
+        do {
+            //v1 = 2.0f * Random.Range(0f,1f) - 1.0f;
+            //v2 = 2.0f * Random.Range(0f,1f) - 1.0f;
+            v1 = deviatioin;
+            v2 = deviatioin;
+            s = v1 * v1 + v2 * v2;
+        } while (s >= 1.0f || s == 0f);
+        s = Mathf.Sqrt((-2.0f * Mathf.Log(s)) / s);
+
+        return v1 * s;
+    }
+
     public List<GameObject> FindChildren(GameObject cylinder) {
         List<GameObject> progeny = new List<GameObject>();
 
@@ -309,8 +477,8 @@ public class TreeImporter : MonoBehaviour
 
         // preprocess and build a tree data structure (already did this)
         HashSet<GameObject> children;
-        if (tree.ContainsKey(cylinder)) {
-            children = tree[cylinder];
+        if (childMap.ContainsKey(cylinder)) {
+            children = childMap[cylinder];
         }
         else {
             children = new HashSet<GameObject>();
@@ -346,8 +514,8 @@ public class TreeImporter : MonoBehaviour
             orders.Add(order);
         }
         HashSet<GameObject> children; // I really need a getordefault method
-        if (tree.ContainsKey(root)) {
-            children = tree[root];
+        if (childMap.ContainsKey(root)) {
+            children = childMap[root];
         }
         else {
             children = new HashSet<GameObject>();
@@ -414,26 +582,41 @@ public class TreeImporter : MonoBehaviour
     public void SetHidden(GameObject go, bool hidden) {
         go.GetComponent<Collider>().enabled = hidden;
         go.SetActive(hidden);
+        // quantifier.UpdateTree();
+        Debug.Log("queued");
+        quantifier.QueueTreeUpdate();
     }
 
-    /*
-    public void BuildParents() {
-        // build parents
-        for (int k = 1; k < cylinders.Count; k++) {
-            int parentId = parentIds[k] - 1;
-            if (parentId < 0) continue;
-            GameObject cylinder = cylinders[k];
-            GameObject parentCylinder = cylinders[parentId];
-            //- cylinder.transform.parent = parentCylinder.transform;
-            Vector3 lookPos = parentCylinder.transform.position - cylinder.transform.position;
-            Quaternion rotation = Quaternion.LookRotation(Vector3.forward, lookPos);
-            Debug.DrawRay(cylinder.transform.position, lookPos);
-            // Debug.DrawRay(cylinder.transform.position, rotation);
-            // cylinder.transform.rotation = rotation;
-            // cylinder.transform.LookAt(parentCylinder.transform, Vector3.left);
+    public void HideLeaves(bool hidden) {
+        foreach (GameObject leaf in leaves) {
+            SetHidden(leaf, hidden);
         }
     }
-    */
+
+    bool areLeavesHidden = false;
+    public void ToggleLeaves() {
+        areLeavesHidden = !areLeavesHidden;
+        HideLeaves(areLeavesHidden);
+    }
+
+        /*
+        public void BuildParents() {
+            // build parents
+            for (int k = 1; k < cylinders.Count; k++) {
+                int parentId = parentIds[k] - 1;
+                if (parentId < 0) continue;
+                GameObject cylinder = cylinders[k];
+                GameObject parentCylinder = cylinders[parentId];
+                //- cylinder.transform.parent = parentCylinder.transform;
+                Vector3 lookPos = parentCylinder.transform.position - cylinder.transform.position;
+                Quaternion rotation = Quaternion.LookRotation(Vector3.forward, lookPos);
+                Debug.DrawRay(cylinder.transform.position, lookPos);
+                // Debug.DrawRay(cylinder.transform.position, rotation);
+                // cylinder.transform.rotation = rotation;
+                // cylinder.transform.LookAt(parentCylinder.transform, Vector3.left);
+            }
+        }
+        */
 
     public static void CenterOnChildred(Transform aParent) {
         // var childs = aParent.Cast<Transform>().ToList();
@@ -463,13 +646,13 @@ public class TreeImporter : MonoBehaviour
 
     public int GetBranchOrder(GameObject cylinder) {
         // should add null check
-        Cylinder datum = cylinderMap[cylinder];
+        Cylinder datum = go2cylinder[cylinder];
         return datum.branchOrder;
     }
 
     public Color GetBranchColor(GameObject cylinder) {
         // should add null check
-        Cylinder datum = cylinderMap[cylinder];
+        Cylinder datum = go2cylinder[cylinder];
 
         /*if (datum.isWaterSprout) {
             return Color.white;

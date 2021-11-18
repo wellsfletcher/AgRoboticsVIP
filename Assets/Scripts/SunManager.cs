@@ -1,11 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+// using System.DateTime;
+using System;
 
 public class SunManager : MonoBehaviour
 {
     public class SunState {
         public string timestamp;
+        public System.DateTime date;
         public Vector3 position;
         public Quaternion rotation;
         public Quaternion lightRotation;
@@ -19,11 +22,14 @@ public class SunManager : MonoBehaviour
     private Vector3 treeDestinationPos;
 
     public LightQuantifier quantifier;
+    public TreeImporter treeImporter;
     private List<SunState> states;
     private int stateIndex = 0;
 
     // Start is called before the first frame update
     void Start() {
+        treeImporter = gameObject.GetComponent<TreeImporter>();
+
         treeDestinationPos = treeDestination.transform.position;
 
         string path = Application.persistentDataPath + "/SunLocations.csv";
@@ -35,6 +41,7 @@ public class SunManager : MonoBehaviour
     }
 
     // Update is called once per frame
+    private bool firstRun = true;
     void Update() {
         if (!Done()) {
             GatherData();
@@ -46,18 +53,49 @@ public class SunManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.X)) {
             NextSunPosition();
         }
+        if (Input.GetKeyDown(KeyCode.R)) {
+            Restart();
+        }
 
-        CompareToBaseline();
+        //- CompareToBaseline(); // this queues sun update
+        Debug.Log(CalculateAverageLightExposure());
     }
     
     private void UpdateSun() {
         SunState state = states[stateIndex];
+
+        // make leaves change over time
+        // make sure this updates properly
+        float leafScale = CalculateLeafScaleOverTime(state.date);
+        treeImporter.tree.SetLeafPercentScale(leafScale);
+
+        // quantifier.UpdateTree();
+        // may wanna update tree immediately
+        quantifier.QueueTreeUpdate();
         grid.position = state.position;
         grid.rotation = state.rotation;
         state.totalHits = quantifier.totalHits; // totalHits
+    
         // Debug.Log("timestamp = " + state.timestamp + ", totalHits = " + normalizeTotalHits(state.totalHits));
         // light.rotation = state.lightRotation;
         //- buildTotalHitsCSV();
+    }
+
+    /*
+     * Returns a value between 0 and 1
+     */
+    private float CalculateLeafScaleOverTime(DateTime timestamp) {
+        // DateTime winter = timestamp.AddMonths(0);
+        // winter.Month = 12;
+        // actually we're just gonna say winter is Jan 1st
+        int month = timestamp.Month - 1;
+        int day = timestamp.Day;
+        float timeFromWinter = month + (timestamp.Day / 30f); // fight me
+        if (month > 5) {
+            timeFromWinter = 12 - (month + (timestamp.Day / 30f));
+        }
+        float normalizedTimeFromWinter = timeFromWinter / 6.0f;
+        return normalizedTimeFromWinter;
     }
 
     public void PreviousSunPosition() {
@@ -90,7 +128,7 @@ public class SunManager : MonoBehaviour
     }
 
     public string GetBaselineText() {
-        UpdateSun();
+        //- UpdateSun(); // nah
 
         SunState state = states[stateIndex];
         int baseHits = state.baseTotalHits;
@@ -108,7 +146,7 @@ public class SunManager : MonoBehaviour
     }
 
     public float[] GetBaseline() {
-        UpdateSun();
+        //- UpdateSun();
 
         SunState state = states[stateIndex];
         int baseHits = state.baseTotalHits;
@@ -126,7 +164,13 @@ public class SunManager : MonoBehaviour
     public void GatherData() {
         UpdateSun();
         SunState state = states[stateIndex];
-        state.baseTotalHits = state.totalHits;
+        if (firstRun) {
+            // user could technically mess this up
+            state.baseTotalHits = state.totalHits;
+        }
+        else {
+            state.totalHits = state.totalHits;
+        }
         stateIndex++;
     }
 
@@ -136,11 +180,17 @@ public class SunManager : MonoBehaviour
 
         if (!result && stateIndex >= states.Count) {
             result = true;
+            firstRun = false;
             stateIndex = states.Count - 1;
         }
 
         isDone = result;
         return result;
+    }
+
+    public void Restart() {
+        stateIndex = 0;
+        isDone = false;
     }
 
     public float normalizeTotalHits(int totalHits) {
@@ -155,6 +205,29 @@ public class SunManager : MonoBehaviour
             n += System.Math.Max(n, state.baseTotalHits);
         }
         return ((float)totalHits) / n;
+    }
+
+    public float CalculateAverageLightExposure() {
+        int n = 0;
+        foreach (SunState state in states) {
+            // n += System.Math.Max(n, state.baseTotalHits);
+            n = System.Math.Max(n, state.baseTotalHits);
+        }
+        int N = states.Count;
+        float total = 0;
+        foreach (SunState state in states) {
+            if (state.totalHits >= 1) {
+                float normalizedLightExposure = ((float)state.totalHits) / n;
+                total += normalizedLightExposure;
+                Debug.Log(state.totalHits);
+                // be careful if it is zero
+            }
+            else {
+                N--;
+            }
+        }
+        N = System.Math.Max(N, 1);
+        return total / N;
     }
 
     private void buildTotalHitsCSV() {
@@ -208,6 +281,12 @@ public class SunManager : MonoBehaviour
                 state.rotation = Quaternion.LookRotation(pos, Vector3.down);
                 state.lightRotation = Quaternion.LookRotation(pos, Vector3.up);
                 state.timestamp = timestamp;
+
+                string parsedTimestamp = timestamp.Split("+"[0])[0].Trim();
+                // Debug.Log(parsedTimestamp);
+                DateTime date = DateTime.ParseExact(parsedTimestamp, "yyyy-MM-dd HH:mm:ss", null);
+                state.date = date;
+                // Debug.Log(date.ToString());
 
                 // Debug.Log(words.Length);
                 // sunData.Add(parameters);

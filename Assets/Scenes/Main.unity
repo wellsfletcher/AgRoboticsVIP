@@ -2446,6 +2446,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cylinderPrefab: {fileID: 2081614836226307479, guid: 355b98f4bc42142a4bab2ff237bfd7f8, type: 3}
+  leafPrefab: {fileID: 2762687754160781925, guid: cf53be32cc8a04a9081fa5bce61a1c2c, type: 3}
   treeDestination: {fileID: 222146482}
   waterSproutMat: {fileID: 2100000, guid: ec739259ec61f5d4ba3ed6d34fd802a6, type: 2}
   currentOrder: 0

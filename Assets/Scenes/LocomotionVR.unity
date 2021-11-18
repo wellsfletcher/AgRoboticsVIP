@@ -403,6 +403,7 @@ MonoBehaviour:
   light: {fileID: 1755501376}
   treeDestination: {fileID: 1411169650}
   quantifier: {fileID: 261746719}
+  treeImporter: {fileID: 261746718}
 --- !u!114 &261746718
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -416,6 +417,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cylinderPrefab: {fileID: 2081614836226307479, guid: 355b98f4bc42142a4bab2ff237bfd7f8, type: 3}
+  leafPrefab: {fileID: 2762687754160781925, guid: cf53be32cc8a04a9081fa5bce61a1c2c, type: 3}
   treeDestination: {fileID: 1411169650}
   waterSproutMat: {fileID: 2100000, guid: ec739259ec61f5d4ba3ed6d34fd802a6, type: 2}
   currentOrder: 0
@@ -688,7 +690,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
-  m_RenderPostProcessing: 1
+  m_RenderPostProcessing: 0
   m_Antialiasing: 1
   m_AntialiasingQuality: 2
   m_StopNaN: 1
@@ -1498,7 +1500,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
-  m_RenderPostProcessing: 1
+  m_RenderPostProcessing: 0
   m_Antialiasing: 1
   m_AntialiasingQuality: 2
   m_StopNaN: 1
@@ -3456,7 +3458,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
-  m_RenderPostProcessing: 1
+  m_RenderPostProcessing: 0
   m_Antialiasing: 1
   m_AntialiasingQuality: 2
   m_StopNaN: 1

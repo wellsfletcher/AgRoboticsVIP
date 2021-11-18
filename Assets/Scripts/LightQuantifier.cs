@@ -21,7 +21,23 @@ public class LightQuantifier : MonoBehaviour {
             hideRaycast = !hideRaycast;
         }
 
+        // only call this as needed, insteaded of on every update
+        // i.e. whenever sun is moved, branch is deleted, etc.
+        // QuantifyLight(grid);
+        if (shouldUpdateTree) {
+            UpdateTree();
+            shouldUpdateTree = false;
+        }
+    }
+    
+    public void UpdateTree() {
         QuantifyLight(grid);
+        Debug.Log("tree updated");
+    }
+
+    private bool shouldUpdateTree = false;
+    public void QueueTreeUpdate() {
+        shouldUpdateTree = true;
     }
 
     void QuantifyLight(Transform grid) {
@@ -33,7 +49,7 @@ public class LightQuantifier : MonoBehaviour {
         // do a bunch of raycasts from the grid
         Vector3 direction = grid.TransformDirection(Vector3.up);
         Vector3 offset = new Vector3(-1, 0, -1);
-        float STEP = 0.025f; // 0.01f; // 0.025f;
+        float STEP = 0.025f; // 0.025f; // 0.01f; // 0.025f;
         float SCALE = 5.0f;
         for (float x = 0; x <= 2.0; x += STEP) {
             for (float z = 0; z <= 2.0; z += STEP) {
