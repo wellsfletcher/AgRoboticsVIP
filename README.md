@@ -25,3 +25,13 @@ The `Assets/Scenes/LocomotionVR.unity` scene is the primary scene that gets run 
 `U` -> Undo branch removals
 
 `H` -> Hide raycasts
+
+`L` -> Toggle leaves
+
+`R` -> Restart light metric
+
+`1` -> Show sphere metric
+
+`2` -> Hide sphere metric
+
+`0` -> Export tree to clipboard
