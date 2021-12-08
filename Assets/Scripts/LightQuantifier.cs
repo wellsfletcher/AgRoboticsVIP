@@ -44,12 +44,13 @@ public class LightQuantifier : MonoBehaviour {
         // use counter to keep track of which cylinders are hit by the raycast
         Dictionary<Transform, int> counter = new Dictionary<Transform, int>();
         // LayerMask layerMask = -1;
-        LayerMask layerMask = LayerMask.GetMask("cylinder");
+        // LayerMask layerMask = LayerMask.GetMask("cylinder");
+        LayerMask layerMask = LayerMask.GetMask("leaf"); // make leaves absorb light instead of cylinders
         RaycastHit hit;
         // do a bunch of raycasts from the grid
         Vector3 direction = grid.TransformDirection(Vector3.up);
         Vector3 offset = new Vector3(-1, 0, -1);
-        float STEP = 0.025f; // 0.025f; // 0.01f; // 0.025f;
+        float STEP = 0.02f; // 0.025f; // 0.01f; // 0.025f;
         float SCALE = 5.0f;
         for (float x = 0; x <= 2.0; x += STEP) {
             for (float z = 0; z <= 2.0; z += STEP) {
@@ -61,7 +62,8 @@ public class LightQuantifier : MonoBehaviour {
                 if (!hideRaycast)
                     Debug.DrawRay(start, direction);
                 if (collided) {
-                    Transform cylinder = hit.transform;
+                    // Transform cylinder = hit.transform;
+                    Transform cylinder = hit.collider.transform;
                     if (!hideRaycast)
                         Debug.DrawLine(start, hit.point, Color.red);
                     if (counter.ContainsKey(cylinder)) {
@@ -84,6 +86,7 @@ public class LightQuantifier : MonoBehaviour {
             Color branchColor = treeImporter.GetBranchColor(cylinder.gameObject);
             Color color = Color.Lerp(Color.black, branchColor, 0.5f);
             cylinder.GetComponent<MeshRenderer>().material.color = color;
+            // Debug.Log(cylinder.gameObject.name);
         }
     }
 
@@ -95,6 +98,7 @@ public class LightQuantifier : MonoBehaviour {
         totalHits = 0;
         foreach (Transform cylinder in counter.Keys) {
             int count = counter[cylinder];
+            Debug.Log(cylinder.gameObject.name);
             maxCount = Mathf.Max(count, maxCount);
             totalHits += count;
         }
@@ -109,6 +113,8 @@ public class LightQuantifier : MonoBehaviour {
             Color branchColor = treeImporter.GetBranchColor(cylinder.gameObject);
             // Color color = Color.Lerp(branchColor, Color.white, exposure);
             Color color = Color.Lerp(Color.black, branchColor, 0.5f + (exposure / 2f));
+            // Debug.Log(color);
+            // Debug.Log(cylinder.gameObject.name);
 
             // Color color = new Color(exposure, exposure, exposure);
             // Color color = GetRainbowColor(branchOrder % 4, 4);

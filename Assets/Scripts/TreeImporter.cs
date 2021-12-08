@@ -2,24 +2,76 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 // using System;
+using System.Linq;
+
+public class Sphere {
+    public Vector3 point;
+    public float radius;
+    public GameObject gameObject;
+
+    public Sphere() : this(Vector3.zero, 1f) {
+
+    }
+
+    public Sphere(Vector3 point, float radius) {
+        this.point = point;
+        this.radius = radius;
+    }
+
+    public Transform transform {
+        get {
+            return this.gameObject.transform;
+        }
+    }
+    public float diamater {
+        get {
+            return radius * 2;
+        }
+    }
+
+    public GameObject Instantiate(GameObject prefab) {
+        gameObject = Object.Instantiate(prefab, point, Quaternion.identity);
+        gameObject.transform.localScale = Vector3.one * diamater; // 2f
+        return gameObject;
+    }
+
+    public void Recalculate() {
+        if (gameObject == null) return;
+        transform.position = point;
+        gameObject.transform.localScale = Vector3.one * diamater; // 2f
+    }
+
+    public void Copy(Sphere sphere) {
+        this.point = sphere.point;
+        this.radius = sphere.radius;
+        Recalculate();
+    }
+}
 
 public class TreeImporter : MonoBehaviour
 {
     public class Cylinder {
         public GameObject gameObject;
         // public GameObject parent;
+        float radius;
+        float length;
         public int id;
         public int parentId;
         public int branchOrder;
         public bool isWaterSprout;
         public HashSet<GameObject> leaves;
+        public List<float> parameters;
+        public bool wasPruned;
 
-        public Cylinder(GameObject cylinder, TreeImporter treeImporter, int id, int parentId, int branchOrder, bool isWaterSprout) {
+        public Cylinder(GameObject cylinder, TreeImporter treeImporter, float radius, float length, int id, int parentId, int branchOrder, bool isWaterSprout, List<float> parameters, bool isPruned) {
             this.gameObject = cylinder;
+            this.radius = radius;
+            this.length = length;
             this.id = id;
             this.parentId = parentId;
             this.branchOrder = branchOrder;
             this.isWaterSprout = isWaterSprout;
+            this.parameters = parameters;
 
             if (isWaterSprout) {
                 cylinder.GetComponent<MeshRenderer>().material = treeImporter.waterSproutMat;
@@ -29,8 +81,62 @@ public class TreeImporter : MonoBehaviour
             Color branchColor = color();
             Color colorLerp = Color.Lerp(Color.black, branchColor, 0.5f);
             cylinder.GetComponent<MeshRenderer>().material.color = colorLerp;
+
+            this.wasPruned = isPruned;
         }
 
+        // look up C# computed properties if you're confused about how this works
+        public Vector3 position {
+            get {
+                return this.gameObject.transform.position;
+            }
+        }
+        public Quaternion rotation {
+            get {
+                return this.gameObject.transform.rotation;
+            }
+        }
+        public Transform transform {
+            get {
+                return this.gameObject.transform;
+            }
+        }
+        public float diamater {
+            get {
+                return radius * 2;
+            }
+        }
+        public float volume {
+            get {
+                // V = π r^2 h
+                return Mathf.PI * radius * radius * length;
+            }
+        }
+        public bool isPruned {
+            get {
+                return !gameObject.activeSelf;
+            }
+        }
+        public string csv {
+            get {
+                string result = "";
+                int pruned = this.isPruned ? 1 : 0;
+                if (parameters.Count > 19) { // this stuff is gross and exists to support legacy cylinder files
+                    parameters[19] = pruned; // update isPruned column
+                }
+                foreach (float parameter in parameters) {
+                    result += parameter + ",";
+                }
+                if (parameters.Count <= 19) {
+                    result += pruned + ",";
+                }
+                // remove trailing comma
+                result = result.TrimEnd(',');
+                return result;
+            }
+        }
+
+        // this should be a computed property
         public Color color() {
             if (isWaterSprout) {
                 return Color.white;
@@ -46,25 +152,50 @@ public class TreeImporter : MonoBehaviour
         public HashSet<GameObject> GetLeaves() {
             return leaves;
         }
+
+        public void SetHidden(bool hidden) {
+            gameObject.GetComponent<Collider>().enabled = hidden;
+            gameObject.SetActive(hidden);
+            //- Debug.Log("queued");
+            //- quantifier.QueueTreeUpdate();
+        }
     }
 
     public class Leaf {
-        GameObject gameObject;
-        Cylinder cylinder;
+        public GameObject gameObject;
+        public Cylinder cylinder;
         Vector3 baseScale;
         public Leaf(GameObject leaf, Cylinder cylinder) {
             this.gameObject = leaf;
             this.cylinder = cylinder;
             this.baseScale = leaf.transform.localScale;
+            leaf.GetComponent<MeshRenderer>().material.color = cylinder.color();
         }
 
         public void SetPercentScale(float percent) {
             // this.gameObject.transform.localScale = Vector3.one * scale * percent;
             this.gameObject.transform.localScale = baseScale * percent;
         }
+
+        /*
+        public void SetHidden(bool hidden) {
+            gameObject.GetComponent<Collider>().enabled = hidden;
+            gameObject.SetActive(hidden);
+            // this needs to queue a tree update
+            //- Debug.Log("queued");
+            //- quantifier.QueueTreeUpdate();
+        }
+        */
+
+        public void SetRendering(bool hidden) {
+            // gameObject.GetComponent<Collider>().enabled = hidden;
+            // gameObject.SetActive(hidden);
+            gameObject.GetComponent<MeshRenderer>().enabled = hidden;
+        }
     }
 
     public class Tree {
+        /*
         List<GameObject> cylinders;
         List<GameObject> leaves;
         Dictionary<GameObject, Cylinder> go2cylinder;
@@ -76,11 +207,93 @@ public class TreeImporter : MonoBehaviour
             this.go2cylinder = go2cylinder;
             this.go2leaf = go2leaf;
         }
+        */
+        List<Cylinder> cylinders;
+        List<Leaf> leaves;
+
+        public Tree(List<Cylinder> cylinders, List<Leaf> leaves) {
+            this.cylinders = cylinders;
+            this.leaves = leaves;
+        }
+
+        public Tree(string csv) {
+            Import(csv);
+        }
 
         public void SetLeafPercentScale(float percent) {
+            foreach (Leaf leaf in leaves) {
+                leaf.SetPercentScale(percent);
+            }
+        }
+
+        public void Import(string csv) {
+
+        }
+
+        public string Export() {
+            string lines = "";
+
+            foreach (Cylinder cylinder in cylinders) {
+                lines += cylinder.csv;
+                // lines += cylinder.isPruned ? 1 : 0;
+                lines += "\n";
+            }
+
+            return lines.Trim();
+        }
+
+        public void ExportToClipboard() {
+            string csv = Export();
+            GUIUtility.systemCopyBuffer = csv;
+        }
+
+        /*
+        public void HideLeaves(bool hidden) {
             foreach (GameObject leaf in leaves) {
-                Leaf datum = go2leaf[leaf];
-                datum.SetPercentScale(percent);
+                leaf.SetHidden(hidden);
+            }
+        }
+
+        bool areLeavesHidden = false;
+        public void ToggleLeaves() {
+            areLeavesHidden = !areLeavesHidden;
+            HideLeaves(areLeavesHidden);
+        }
+        
+        public void Unhide() {
+            foreach (GameObject cylinder in cylinders) {
+                SetHidden(cylinder, true);
+            }
+        }
+        */
+
+        public void Unhide() {
+            foreach (Cylinder cylinder in cylinders) {
+                cylinder.SetHidden(true);
+            }
+        }
+
+        public void ReloadPruning() {
+            foreach (Cylinder cylinder in cylinders) {
+                cylinder.SetHidden(!cylinder.wasPruned);
+            }
+        }
+
+        public void SetAllVisibleLeaves(bool hidden) {
+            foreach (Leaf leaf in leaves) {
+                leaf.SetRendering(hidden);
+            }
+        }
+
+        public void SetPercentVisibleLeaves(float percent) {
+            SetAllVisibleLeaves(true);
+
+            foreach (Leaf leaf in leaves) {
+                // get a random number
+                float roll = Random.Range(0f, 1f);
+                if (roll > percent) {
+                    leaf.SetRendering(false);
+                }
             }
         }
     }
@@ -135,10 +348,17 @@ public class TreeImporter : MonoBehaviour
             NextBranchOrder();
         }
         if (Input.GetKeyDown(KeyCode.U)) { // || OVRInput.GetDown(OVRInput.Button.Two)) {
-            UnhideTree();
+            // UnhideTree();
+            tree.Unhide();
+        }
+        if (Input.GetKeyDown(KeyCode.Y)) { // || OVRInput.GetDown(OVRInput.Button.Two)) {
+            tree.ReloadPruning();
         }
         if (Input.GetKeyDown(KeyCode.L)) { // || OVRInput.GetDown(OVRInput.Button.Two)) {
             ToggleLeaves();
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha0)) {
+            tree.ExportToClipboard();
         }
     }
 
@@ -206,10 +426,22 @@ public class TreeImporter : MonoBehaviour
     }
     */
 
-    List<GameObject> cylinders = new List<GameObject>();
+    List<Cylinder> cylinders2 = new List<Cylinder>(); // this should be the main list that gets used
+    List<GameObject> cylinders = new List<GameObject>(); // this should become deprecated
+    List<Leaf> leaves2 = new List<Leaf>();
     List<GameObject> leaves = new List<GameObject>();
     List<int> parentIds = new List<int>();
     List<int> branchOrders = new List<int>();
+
+    /*
+    private string MakeCSVLine(List<float> parameters) {
+        string result = "";
+        foreach (float parameter in parameters) {
+            result += parameter + ",";
+        }
+        return result;
+    }
+    */
 
     private void PlaceCylinders(List<List<float>> cylinderData, GameObject parent) {
         // Vector3 axis = Vector3.up;
@@ -232,17 +464,21 @@ public class TreeImporter : MonoBehaviour
             float axisZ = parameters[6];
             float axisY = parameters[7];
 
-            int parentId = (int) parameters[8];
-            int branchOrder = (int) parameters[15];
+            int parentId = (int)parameters[8];
+            int branchOrder = (int)parameters[15];
 
             bool isWaterSprout = (parameters[17] == 0 ? false : true); // column R
             // float waterSproutScore = parameters[18];
+            bool isPruned = false;
+            if (parameters.Count > 19) {
+                isPruned = (parameters[19] == 0 ? false : true);
+            }
 
             Vector3 position = new Vector3(posX, posY, posZ);
             Vector3 dir = new Vector3(axisX, axisY, axisZ);
             // Quaternion rotation = Quaternion.LookRotation(axis, dir);
             Quaternion rotation = Quaternion.LookRotation(dir) * Quaternion.FromToRotation(Vector3.up, Vector3.forward);
-            Vector3 scale = new Vector3(diameter, length * 0.5f, diameter);
+            Vector3 scale = new Vector3(diameter, length * 0.5f * 2, diameter);
 
             // GameObject cylinder = Object.Instantiate(cylinderPrefab, position, rotation, parent.transform);
 
@@ -303,7 +539,7 @@ public class TreeImporter : MonoBehaviour
                 joint.useLimits = true;
                 */
             }
-           
+
             /*
             Cylinder datum = new Cylinder();
             datum.gameObject = cylinder;
@@ -311,15 +547,15 @@ public class TreeImporter : MonoBehaviour
             datum.parentId = parentId;
             datum.branchOrder = branchOrder;
             */
-            Cylinder datum = new Cylinder(cylinder, this, id, parentId, branchOrder, isWaterSprout);           
+            Cylinder datum = new Cylinder(cylinder, this, radius, length, id, parentId, branchOrder, isWaterSprout, parameters, isPruned);
             go2cylinder[cylinder] = datum;
-
+            cylinders2.Add(datum);
 
 
 
 
             // leaves generation from here
-            int density = 4; // 10
+            int density = 1; // 10
             for (int i = 0; i < density; i++) {
                 float a = Random.Range(-0.1f, 0.1f);
                 float b = Random.Range(-0.1f, 0.1f);
@@ -363,7 +599,7 @@ public class TreeImporter : MonoBehaviour
                 z /= cylinder.transform.localScale.z;
 
                 leaf.transform.localScale = new Vector3(x, y, z);
-                Debug.Log("|leaf|: grandScale = " + grandScale + ", fromCenter = " + fromCenter + ", probablity = " + probablity + ", deviationSize = " + deviationSize + ", sphereSize = " + x);
+                // Debug.Log("|leaf|: grandScale = " + grandScale + ", fromCenter = " + fromCenter + ", probablity = " + probablity + ", deviationSize = " + deviationSize + ", sphereSize = " + x);
                 //- leaf.GetComponent<Renderer>().material.color = Color.green;
                 //- leaf.GetComponent<Renderer>().material.color = datum.color();
                 //var col = leaf.GetComponent<Renderer> ().material.GetColor("_TintColor");
@@ -373,11 +609,13 @@ public class TreeImporter : MonoBehaviour
 
                 Leaf leafDatum = new Leaf(leaf, datum);
                 go2leaf[leaf] = leafDatum;
+                leaves2.Add(leafDatum);
             }
             // leaves generation ends here
 
-
-
+            if (isPruned) {
+                SetHidden(cylinder, false);
+            }
 
             id++;
         }
@@ -388,7 +626,8 @@ public class TreeImporter : MonoBehaviour
         parent.transform.localScale *= 3;
 
         // make tree objects
-        tree = new Tree(cylinders, leaves, go2cylinder, go2leaf);
+        // tree = new Tree(cylinders, leaves, go2cylinder, go2leaf);
+        tree = new Tree(cylinders2, leaves2);
 
         // build parents
         for (int k = 1; k < cylinders.Count; k++) {
@@ -418,6 +657,8 @@ public class TreeImporter : MonoBehaviour
         // ColorBranches();
         BuildOrders(cylinders[0]);
         currentOrder = orders.Count - 1;
+
+        tree.SetPercentVisibleLeaves(.1f);
     }
 
     private void AddJoint(GameObject a, GameObject parent, Vector3 point) {
@@ -431,16 +672,89 @@ public class TreeImporter : MonoBehaviour
         return 0;
     }
 
-    class Sphere {
-        Vector3 point;
-        float radius;
-        public Sphere(Vector3 point, float radius) {
-            this.point = point;
-            this.radius = radius;
-        }
+    public float GetPercentEnclosed(Sphere sphere) {
+        return GetPercentEnclosed((from item in cylinders2
+                          where item.gameObject.active == true
+                          select item).ToList(), sphere);
     }
 
-    private Sphere fitSphere(List<Vector3> points) {
+    public float GetPercentEnclosed(List<Cylinder> cylinders, Sphere sphere) {
+        int n = cylinders2.Count; // I apologize
+        float total = 0;
+
+        foreach (Cylinder cylinder in cylinders) {
+            float distance = (sphere.point - cylinder.position).magnitude;
+            if (distance <= sphere.radius) {
+                total++;
+            }
+        }
+
+        return total / n;
+    }
+
+    public Sphere FitSphere() {
+        return FitSphere((from item in cylinders2
+                          where item.gameObject.active == true
+                          select item).ToList());
+    }
+
+    private Vector3 GetCentroid(List<Cylinder> cylinders) {
+        int n = cylinders.Count;
+        Vector3 total = Vector3.zero;
+        foreach (Cylinder cylinder in cylinders) {
+            total += cylinder.position;
+        }
+        return total / n;
+    }
+
+    private float GetAverageRadius(List<Cylinder> cylinders, Vector3 origin) {
+        int n = cylinders.Count;
+        double total = 0;
+        foreach (Cylinder cylinder in cylinders) {
+            total += (origin - cylinder.position).magnitude;
+        }
+        return (float) total / n;
+    }
+
+    private Vector3 GetWeightedCentroid(List<Cylinder> cylinders) {
+        float n = (float) GetTotalVolume(cylinders);
+        Vector3 total = Vector3.zero;
+        foreach (Cylinder cylinder in cylinders) {
+            float weight = cylinder.volume / n;
+            total += cylinder.position * weight;
+        }
+        return total;
+    }
+
+    private double GetTotalVolume(List<Cylinder> cylinders) {
+        double total = 0;
+        foreach (Cylinder cylinder in cylinders) {
+            total += cylinder.volume;
+        }
+        return total;
+    }
+
+    private float GetWeightedAverageRadius(List<Cylinder> cylinders, Vector3 origin) {
+        double n = GetTotalVolume(cylinders);
+        double total = 0;
+        foreach (Cylinder cylinder in cylinders) {
+            double weight = cylinder.volume / n;
+            total += (origin - cylinder.position).magnitude * weight;
+        }
+        return (float) total;
+    }
+
+    public Sphere FitSphere(List<Cylinder> cylinders) {
+        // calculate the centroid and then the average radius
+        float n = cylinders.Count;
+        Vector3 total = Vector3.zero;
+        Vector3 centroid = GetWeightedCentroid(cylinders);
+        float radius = GetWeightedAverageRadius(cylinders, centroid);
+
+        return new Sphere(centroid + Vector3.up * 0, radius);
+    }
+
+    public Sphere FitSphere(List<Vector3> points) {
 
 
 
@@ -650,7 +964,7 @@ public class TreeImporter : MonoBehaviour
         return datum.branchOrder;
     }
 
-    public Color GetBranchColor(GameObject cylinder) {
+    public Color GetBranchColor2(GameObject cylinder) {
         // should add null check
         Cylinder datum = go2cylinder[cylinder];
 
@@ -661,16 +975,24 @@ public class TreeImporter : MonoBehaviour
         return datum.color();
     }
 
+    public Color GetBranchColor(GameObject cylinder) {
+        if (!go2leaf.ContainsKey(cylinder)) {
+            return Color.black;
+        }
+
+        Leaf datum = go2leaf[cylinder];
+
+        return datum.cylinder.color();
+    }
+
     private List<List<float>> ParseCylinderCSV(string path) {
         string fileData = System.IO.File.ReadAllText(path);
         return ParseCylinderCSVString(fileData);
     }
 
     private List<List<float>> ParseCylinderCSV() {
-        // Constants constants = transform.GetComponent<Constants>();
-        // string fileData = System.IO.File.ReadAllText(path);
-        // string fileData = Constants.CylindersFull;
-        string fileData = Constants.CylindersFull1a; // CylindersFull1a, CylindersFull3a
+        // string fileData = Constants.CylindersFull1a; // CylindersFull1a, CylindersFull3a, CylindersFull1aPruned
+        string fileData = Constants.CylindersFull1a;
         return ParseCylinderCSVString(fileData);
     }
 

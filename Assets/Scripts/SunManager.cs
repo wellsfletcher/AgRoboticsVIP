@@ -84,7 +84,7 @@ public class SunManager : MonoBehaviour
     /*
      * Returns a value between 0 and 1
      */
-    private float CalculateLeafScaleOverTime(DateTime timestamp) {
+    private float CalculateLeafScaleOverTimeSimple(DateTime timestamp) {
         // DateTime winter = timestamp.AddMonths(0);
         // winter.Month = 12;
         // actually we're just gonna say winter is Jan 1st
@@ -96,6 +96,33 @@ public class SunManager : MonoBehaviour
         }
         float normalizedTimeFromWinter = timeFromWinter / 6.0f;
         return normalizedTimeFromWinter;
+    }
+
+    private float CalculateLeafScaleOverTime(DateTime timestamp) {
+        // DateTime winter = timestamp.AddMonths(0);
+        // winter.Month = 12;
+        // actually we're just gonna say winter is Jan 1st
+        /*
+        int month = timestamp.Month - 1;
+        int day = timestamp.Day;
+        float timeFromWinter = month + (timestamp.Day / 30f); // fight me
+        */       
+
+        double leafSize;
+        int year = timestamp.Year;
+        DateTime t0 = new DateTime(year, 1, 1);
+        double days = (timestamp - t0).TotalDays;
+        if (days < 62 || days > 300) {
+            leafSize = 0;
+        }
+        else if (days > 61 && days < 144) {
+            leafSize = (days * days * -0.01051183) + (days * 3.03003144) - 146.791;
+        }
+        else {
+            leafSize = 72.0336;
+        }
+
+        return (float) leafSize / 72.0336f;
     }
 
     public void PreviousSunPosition() {
@@ -145,6 +172,15 @@ public class SunManager : MonoBehaviour
             state.timestamp;
     }
 
+    public DateTime GetCurrentDate() {
+        SunState state = states[stateIndex];
+        return state.date;
+    }
+    public string GetCurrentDateText() {
+        DateTime date = GetCurrentDate();
+        return date.ToString("MMMM dd, yyyy");
+    }
+
     public float[] GetBaseline() {
         //- UpdateSun();
 
@@ -165,6 +201,9 @@ public class SunManager : MonoBehaviour
         UpdateSun();
         SunState state = states[stateIndex];
         if (firstRun) {
+            if (stateIndex == 0) {
+                treeImporter.tree.Unhide();
+            }
             // user could technically mess this up
             state.baseTotalHits = state.totalHits;
         }
@@ -180,6 +219,9 @@ public class SunManager : MonoBehaviour
 
         if (!result && stateIndex >= states.Count) {
             result = true;
+            if (firstRun) {
+                treeImporter.tree.ReloadPruning();
+            }
             firstRun = false;
             stateIndex = states.Count - 1;
         }

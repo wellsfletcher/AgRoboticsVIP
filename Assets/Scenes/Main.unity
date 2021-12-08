@@ -2397,6 +2397,7 @@ GameObject:
   - component: {fileID: 1813328299}
   - component: {fileID: 1813328300}
   - component: {fileID: 1813328301}
+  - component: {fileID: 1813328302}
   m_Layer: 0
   m_Name: Manager
   m_TagString: Untagged
@@ -2466,6 +2467,20 @@ MonoBehaviour:
   light: {fileID: 309397945}
   treeDestination: {fileID: 222146482}
   quantifier: {fileID: 1813328299}
+  treeImporter: {fileID: 0}
+--- !u!114 &1813328302
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1813328297}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81d3ef504e5f146dfb970d4a69bee394, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spherePrefab: {fileID: 6888389500764418186, guid: e6f8e464d5b00430193103a53268e3cf, type: 3}
 --- !u!1 &2062905134
 GameObject:
   m_ObjectHideFlags: 0

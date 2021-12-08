@@ -16,17 +16,170 @@ using UnityEngine.UI;
 using Debug = UnityEngine.Debug;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
+using PruningMetric;
+
+public class MetricPage {
+    Metric metric;
+    int target;
+
+    public MetricPage(Metric metric, int target) {
+        this.metric = metric;
+        this.target = target;
+
+        Build();
+    }
+
+    TextDisplay titleLabel;
+    TextDisplay descriptionLabel;
+    VisualizerBar currentBar;
+    VisualizerBar baselineBar;
+    public MetricButton visualizationButton;
+    public MetricButton calculateButton;
+
+    public void Build() {
+        // DebugUIBuilder.instance.AddLabel(metric.name(), targetCanvas: target);
+        titleLabel = new TextDisplay(metric.name(), target: target);
+        DebugUIBuilder.instance.AddDivider(targetCanvas: target);
+        descriptionLabel = new TextDisplay(metric.description(), target: target);
+        currentBar = new VisualizerBar("Current", target);
+        baselineBar = new VisualizerBar("Baseline", target);
+        /*
+        DebugUIBuilder.instance.AddButton("Toggle Visualization", ToggleVisualization, targetCanvas: target);
+        DebugUIBuilder.instance.AddButton("Calculate", metric.Calculate, targetCanvas: target);
+        */
+        visualizationButton = new MetricButton("Toggle Visualization", ToggleVisualization, target);
+        calculateButton = new MetricButton("Calculate", Calculate, target);
+
+        visualizationButton.SetHidden(metric.VisualizationEnabled());
+    }
+
+    public void Swap(Metric metric) {
+        this.metric = metric;
+        titleLabel.setValue(metric.name());
+        descriptionLabel.setValue(metric.description());
+        visualizationButton.SetHidden(metric.VisualizationEnabled());
+    }
+
+    public void Update() {
+        currentBar.setValue(metric.current());
+        baselineBar.setValue(metric.baseline());
+        // visualizationButton.SetAction();
+    }
+
+    private bool vToggle = false;
+    private void ToggleVisualization() {
+        vToggle = !vToggle;
+        if (vToggle) {
+            metric.Visualize();
+        } else {
+            metric.Hide();
+        }
+    }
+
+    private void Calculate() {
+        metric.Calculate();
+    }
+}
+
+public class VisualizerBar {
+    Text text;
+    Slider slider;
+
+    public VisualizerBar(string initialText) : this(initialText, DebugUIBuilder.DEBUG_PANE_CENTER) {
+
+    }
+
+    public VisualizerBar(string initialText, int target) {
+        RectTransform statusSliderRect = DebugUIBuilder.instance.AddSlider(initialText, 0f, 1f, HandleOnSlider, targetCanvas: target);
+        slider = statusSliderRect.transform.GetChild(0).GetComponent<Slider>();
+        slider.interactable = false;
+        // statusSlider.colors.disabledColor = Color.clear;
+        ColorBlock colors = slider.colors;
+        colors.disabledColor = Color.clear;
+        slider.colors = colors;
+        statusSliderRect.GetChild(1).GetChild(0).GetComponent<Text>().text = initialText;
+        text = statusSliderRect.GetChild(1).GetChild(1).GetComponent<Text>();
+    }
+
+    private void HandleOnSlider(float f) {
+
+    }
+
+    /*
+     * Value is between 0 and 1      
+     */
+    public void setValue(float f) {
+        if (f >= 0.0f && f <= 1.0f) {
+            slider.value = f;
+        }
+        text.text = "" + (f * 100) + "%";
+    }
+}
+
+public class MetricButton {
+    Text text;
+    Button button;
+
+    public MetricButton(string initialText, DebugUIBuilder.OnClick handler) : this(initialText, handler, DebugUIBuilder.DEBUG_PANE_CENTER) {
+
+    }
+
+    public MetricButton(string initialText, DebugUIBuilder.OnClick handler, int target) {
+        RectTransform statusSliderRect = DebugUIBuilder.instance.AddButton(initialText, handler, targetCanvas: target);
+
+        button = statusSliderRect.transform.GetComponent<Button>();
+        // button.interactable = false;
+        /*
+        // statusSlider.colors.disabledColor = Color.clear;
+        ColorBlock colors = button.colors;
+        colors.disabledColor = Color.clear;
+        button.colors = colors;
+        statusSliderRect.GetChild(1).GetChild(0).GetComponent<Text>().text = initialText;
+        text = statusSliderRect.GetChild(1).GetChild(1).GetComponent<Text>();
+        */
+    }
+
+    public void SetHidden(bool hidden) {
+        button.interactable = hidden;
+    }
+
+    /*
+    public void SetAction(DebugUIBuilder.OnClick handler) {
+
+    }
+    */
+}
+
+public class TextDisplay {
+    Text text;
+
+    public TextDisplay(string initialText) : this(initialText, DebugUIBuilder.DEBUG_PANE_CENTER) {}
+
+    public TextDisplay(string initialText, int target) {
+        RectTransform statusLabelRect = DebugUIBuilder.instance.AddLabel(initialText, targetCanvas: target);
+        text = statusLabelRect.GetComponent<Text>();
+    }
+
+    public void setValue(string value) {
+        text.text = value;
+    }
+}
 
 public class LocomotionSampleSupport : MonoBehaviour {
     public SunManager sunManager;
     public TreeImporter treeImporter;
+    public Metrics metrics;
     Text statusLabel;
     Slider statusSlider;
     Text statusSliderText;
     VisualizerBar optimalBar;
     VisualizerBar currentBar;
     // VisualizerBar aBar;
+    TextDisplay dateDisplay;
+    MetricPage bowlMetricPage;
+    MetricPage averageLightMetricPage;
 
+    int state = 0;
 
     private LocomotionController lc;
     private bool inMenu = false;
@@ -38,8 +191,11 @@ public class LocomotionSampleSupport : MonoBehaviour {
 
     public void Start() {
         lc = FindObjectOfType<LocomotionController>();
+        metrics = treeImporter.gameObject.GetComponent<Metrics>();
         DebugUIBuilder.instance.AddLabel("Persephone Menu");
         DebugUIBuilder.instance.AddDivider();
+        dateDisplay = new TextDisplay("June 20");
+        // DebugUIBuilder.instance.AddDivider();
         /*
         DebugUIBuilder.instance.AddButton("Node Teleport w/ A", SetupNodeTeleport);
         DebugUIBuilder.instance.AddButton("Dual-stick teleport", SetupTwoStickTeleport);
@@ -54,14 +210,15 @@ public class LocomotionSampleSupport : MonoBehaviour {
         DebugUIBuilder.instance.AddButton("Next branch order", treeImporter.NextBranchOrder);
         DebugUIBuilder.instance.AddButton("Previous branch order", treeImporter.PreviousBranchOrder);
         DebugUIBuilder.instance.AddButton("Reset tree", treeImporter.UnhideTree);
-        DebugUIBuilder.instance.AddButton("Toggle water sprouts", DoNothing);
-        DebugUIBuilder.instance.AddButton("Toggle leaves", treeImporter.ToggleLeaves);
-        DebugUIBuilder.instance.AddButton("Calc Average Exposure", sunManager.Restart);
+        //- DebugUIBuilder.instance.AddButton("Toggle water sprouts", DoNothing);
+        //-- DebugUIBuilder.instance.AddButton("Toggle leaves", treeImporter.ToggleLeaves);
+        //- DebugUIBuilder.instance.AddButton("Calc Average Exposure", sunManager.Restart);
+        DebugUIBuilder.instance.AddButton("Next page", NextPage);
         // DebugUIBuilder.instance.
         // DebugUIBuilder.instance.addsl
-        DebugUIBuilder.instance.AddDivider();
-        RectTransform statusLabelRect = DebugUIBuilder.instance.AddLabel("Tree Status");
-        statusLabel = statusLabelRect.GetComponent<Text>();
+        //- DebugUIBuilder.instance.AddDivider();
+        //- RectTransform statusLabelRect = DebugUIBuilder.instance.AddLabel("Tree Status");
+        //- statusLabel = statusLabelRect.GetComponent<Text>();
         /*
         RectTransform statusSliderRect = DebugUIBuilder.instance.AddSlider("Exposure", 0f, 1f, HandleOnSlider);
         statusSlider = statusSliderRect.transform.GetChild(0).GetComponent<Slider>();
@@ -73,10 +230,16 @@ public class LocomotionSampleSupport : MonoBehaviour {
         statusSliderRect.GetChild(1).GetChild(0).GetComponent<Text>().text = "Average Light Exposure";
         statusSliderText = statusSliderRect.GetChild(1).GetChild(1).GetComponent<Text>();
         */
-        currentBar = new VisualizerBar("Average Lightness");
-        optimalBar = new VisualizerBar("Optimal Lightness");
+        // currentBar = new VisualizerBar("Average Lightness");
+        // optimalBar = new VisualizerBar("Optimal Lightness");
 
         // DebugUIBuilder.instance.AddDivider();
+
+        //- bowlMetricPage = new MetricPage(metrics.sphereMetric, DebugUIBuilder.DEBUG_PANE_RIGHT);
+        // bowlMetricPage.Build();
+        //- averageLightMetricPage = new MetricPage(metrics.averageLightMetric, DebugUIBuilder.DEBUG_PANE_LEFT);
+        bowlMetricPage = new MetricPage(metrics.averageLightMetric, DebugUIBuilder.DEBUG_PANE_RIGHT);
+        // averageLightMetricPage.visualizationButton.SetHidden(false);
 
 
         /*
@@ -110,35 +273,10 @@ public class LocomotionSampleSupport : MonoBehaviour {
 
     }
 
-    class VisualizerBar {
-        Text text;
-        Slider slider;
-
-        public VisualizerBar(string initialText) {
-            RectTransform statusSliderRect = DebugUIBuilder.instance.AddSlider(initialText, 0f, 1f, HandleOnSlider);
-            slider = statusSliderRect.transform.GetChild(0).GetComponent<Slider>();
-            slider.interactable = false;
-            // statusSlider.colors.disabledColor = Color.clear;
-            ColorBlock colors = slider.colors;
-            colors.disabledColor = Color.clear;
-            slider.colors = colors;
-            statusSliderRect.GetChild(1).GetChild(0).GetComponent<Text>().text = initialText;
-            text = statusSliderRect.GetChild(1).GetChild(1).GetComponent<Text>();
-        } 
-
-        private void HandleOnSlider(float f) {
-
-        }
-
-        /*
-         * Value is between 0 and 1      
-         */     
-        public void setValue(float f) {
-            if (f >= 0.0f && f <= 1.0f) {
-                slider.value = f;
-            }
-            text.text = "" + (f * 100) + "%";
-        }
+    void NextPage() {
+        state = (state + 1) % metrics.metrics.Count;
+        Metric metric = metrics.metrics[state];
+        bowlMetricPage.Swap(metric);
     }
 
     public void RadioPressed(string radioLabel, string group, Toggle t) {
@@ -148,13 +286,17 @@ public class LocomotionSampleSupport : MonoBehaviour {
 
     public void Update()
     {
-        if(OVRInput.GetDown(OVRInput.Button.Two) || OVRInput.GetDown(OVRInput.Button.Start) || Input.GetKey(KeyCode.Period))
+        if(OVRInput.GetDown(OVRInput.Button.Two) || OVRInput.GetDown(OVRInput.Button.Start) || Input.GetKeyDown(KeyCode.Period))
         {
             if (inMenu) DebugUIBuilder.instance.Hide();
             else DebugUIBuilder.instance.Show();
             inMenu = !inMenu;
         }
-        statusLabel.text = sunManager.GetBaselineText();
+        if (Input.GetKeyDown(KeyCode.Alpha6)) {
+            NextPage();
+        }
+
+        //- statusLabel.text = sunManager.GetBaselineText();
         /*
         // statusSlider.value = 0.5f;
         float sliderValue = (100f + sunManager.GetBaseline()[2]) / 100f;
@@ -164,9 +306,14 @@ public class LocomotionSampleSupport : MonoBehaviour {
         }
         */
         // currentBar.setValue((100f + sunManager.GetBaseline()[2]) / 100f);
-        currentBar.setValue(sunManager.CalculateAverageLightExposure());
-        optimalBar.setValue(0.93f);
-        Debug.Log(statusSlider.value);
+        //- currentBar.setValue(sunManager.CalculateAverageLightExposure());
+        //- optimalBar.setValue(0.86f);
+        // Debug.Log(statusSlider.value);
+
+        dateDisplay.setValue(sunManager.GetCurrentDateText());
+
+        bowlMetricPage.Update();
+        //- averageLightMetricPage.Update();
     }
 
     [Conditional("DEBUG_LOCOMOTION_PANEL")]
